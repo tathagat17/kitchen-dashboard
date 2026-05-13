@@ -218,10 +218,7 @@ if dashboard == "📊 Dashboard 1 — Kitchen Level PNL":
             return ""
 
     st.dataframe(
-        pivot.style.background_gradient(
-            subset=[c for c in pivot.columns if "KITCHEN EBITDA" in c],
-            cmap="RdYlGn"
-        ),
+        pivot,
         use_container_width=True,
         height=450
     )
@@ -302,7 +299,7 @@ else:
     pivot2a = pd.concat([pivot2a, grand_row])
 
     # Format as percentage (values are already in %, e.g. 0.62 means 0.62%)
-    pivot2a_display = pivot2a.applymap(lambda x: f"{x:.2f}%" if pd.notnull(x) else "-")
+    pivot2a_display = pivot2a.apply(lambda col: col.map(lambda x: f"{x:.2f}%" if pd.notnull(x) else "-"))
 
     st.dataframe(
         pivot2a_display,
@@ -348,7 +345,7 @@ else:
     pivot2b = pd.concat([pivot2b, grand_row_b])
 
     st.dataframe(
-        pivot2b.style.background_gradient(cmap="YlOrRd", axis=None),
+        pivot2b,
         use_container_width=True
     )
 
