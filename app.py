@@ -80,6 +80,7 @@ df = load_data()
 from datetime import timezone, timedelta
 IST = timezone(timedelta(hours=5, minutes=30))
 last_refresh = datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST")
+
 # ─────────────────────────────────────────────
 # SIDEBAR — NAVIGATION
 # ─────────────────────────────────────────────
@@ -285,27 +286,42 @@ else:
     st.title("📉 Variance Level P&L Dashboard")
     st.markdown("Analyse food material wastage (Variance) across revenue categories and store counts.")
 
-    # ── TOP FILTER ──
-    st.subheader("🔽 Variance Category Filter")
+    # ── FANCY FILTER UI (matching reference image) ──
+    st.markdown("""
+    <div style="background:#f9a825;padding:10px 16px;border-radius:8px 8px 0 0;display:flex;align-items:center;gap:8px;">
+        <span style="color:white;font-weight:700;font-size:1rem;">✔ Variance Category</span>
+    </div>
+    """, unsafe_allow_html=True)
+
     all_buckets = ["(a) Var < 2%", "(b) Var 2% to 3%", "(c) Var 3% to 5%", "(d) Var > 5%"]
-    sel_buckets = st.multiselect(
-        "Select Variance Category (select one or more)",
-        options=all_buckets,
-        default=all_buckets
-    )
+
+    st.markdown('<div style="background:#fff8e1;padding:12px 16px;border:1px solid #f9a825;border-radius:0 0 8px 8px;margin-bottom:16px;">', unsafe_allow_html=True)
+    sel_buckets = []
+    cols_f = st.columns(4)
+    for i, bucket in enumerate(all_buckets):
+        with cols_f[i]:
+            if st.checkbox(bucket, value=True, key=f"var_{i}"):
+                sel_buckets.append(bucket)
+    st.markdown('</div>', unsafe_allow_html=True)
 
     if not sel_buckets:
         st.warning("Please select at least one variance category.")
         st.stop()
 
     vdf = df[df["VARIANCE BUCKET"].isin(sel_buckets)]
-
     months_sorted = df["MONTH"].cat.categories.tolist()
 
-    # ══ SUB-DASHBOARD 2a — AVG VARIANCE % BY REVENUE COHORT ══
+    # ══ SUB-DASHBOARD 2a — AVG VARIANCE % ══
     st.markdown("---")
-    st.subheader("📋 Sub-Dashboard 1 — Average Variance % by Revenue Category")
-    st.caption("Shows average variance % of kitchens under each revenue cohort per month")
+
+    st.markdown("""
+    <div style="background:#1a1a1a;padding:10px 16px;border-radius:6px 6px 0 0;">
+        <span style="color:white;font-weight:700;font-size:1rem;">VARIANCE BY REVENUE CATEGORY</span>
+    </div>
+    <div style="background:#f5f5f5;padding:8px 16px;border:1px solid #ddd;margin-bottom:4px;">
+        <span style="color:#555;font-size:0.8rem;">The tables below summarise the average variance % on cart of the kitchens under revenue categories</span>
+    </div>
+    """, unsafe_allow_html=True)
 
     rev_cohort_order = ["INR 20 to 30 lacs", "INR 30 to 40 lacs", "More than 40 lacs"]
 
@@ -315,41 +331,69 @@ else:
         values="VARIANCE%",
         aggfunc="mean"
     ).round(4)
-
-    # Reorder rows
     pivot2a = pivot2a.reindex([r for r in rev_cohort_order if r in pivot2a.index])
 
-    # Grand total row
-    grand_row = pd.DataFrame(
-        vdf.groupby("MONTH")["VARIANCE%"].mean().round(4)
-    ).T
+    grand_row = pd.DataFrame(vdf.groupby("MONTH")["VARIANCE%"].mean().round(4)).T
     grand_row.index = ["Grand Total"]
     pivot2a = pd.concat([pivot2a, grand_row])
 
-    # Format as percentage (values are already in %, e.g. 0.62 means 0.62%)
-    pivot2a_display = pivot2a.apply(lambda col: col.map(lambda x: f"{x:.2f}%" if pd.notnull(x) else "-"))
+    # Build Plotly table for 2a
+    months_cols = [str(m) for m in pivot2a.columns.tolist()]
+    row_labels  = pivot2a.index.tolist()
+    cell_vals   = []
+    for m in pivot2a.columns:
+        col_vals = []
+        for r in pivot2a.index:
+            v = pivot2a.loc[r, m]
+            col_vals.append(f"{v:.2f}%" if pd.notnull(v) else "-")
+        cell_vals.append(col_vals)
 
-    st.dataframe(
-        pivot2a_display,
-        use_container_width=True
-    )
+    # Row colors — grand total gets darker shade
+    row_colors = ["#ffffff"] * (len(row_labels) - 1) + ["#f0f0f0"]
+    font_colors = ["#333333"] * (len(row_labels) - 1) + ["#000000"]
+    font_weights = [400] * (len(row_labels) - 1) + [700]
 
-    # Chart for 2a
+    fig_2a = go.Figure(data=[go.Table(
+        columnwidth=[200] + [80] * len(months_cols),
+        header=dict(
+            values=["<b>Revenue Category</b>"] + [f"<b>{m}</b>" for m in months_cols],
+            fill_color="#1a1a1a",
+            font=dict(color="white", size=12),
+            align=["left"] + ["center"] * len(months_cols),
+            height=35
+        ),
+        cells=dict(
+            values=[row_labels] + cell_vals,
+            fill_color=[row_colors] + [row_colors] * len(months_cols),
+            font=dict(color=[font_colors] + [font_colors] * len(months_cols), size=12),
+            align=["left"] + ["center"] * len(months_cols),
+            height=32
+        )
+    )])
+    fig_2a.update_layout(margin=dict(l=0, r=0, t=0, b=0), height=200)
+    st.plotly_chart(fig_2a, use_container_width=True)
+
+    # Trend chart
     chart2a = vdf.groupby(["MONTH", "REVENUE COHORT"])["VARIANCE%"].mean().reset_index()
     fig3 = px.line(
         chart2a, x="MONTH", y="VARIANCE%",
-        color="REVENUE COHORT",
-        markers=True,
+        color="REVENUE COHORT", markers=True,
         title="Avg Variance % Trend by Revenue Cohort",
         labels={"VARIANCE%": "Avg Variance %", "MONTH": "Month"}
     )
     fig3.update_layout(plot_bgcolor="white")
     st.plotly_chart(fig3, use_container_width=True)
 
-    # ══ SUB-DASHBOARD 2b — STORE COUNT BY REVENUE BAND ══
+    # ══ SUB-DASHBOARD 2b — STORE COUNT ══
     st.markdown("---")
-    st.subheader("📋 Sub-Dashboard 2 — Store Count by Revenue Range")
-    st.caption("Count of kitchen stores in each revenue band per month, filtered by variance category above")
+    st.markdown("""
+    <div style="background:#1a1a1a;padding:10px 16px;border-radius:6px 6px 0 0;">
+        <span style="color:white;font-weight:700;font-size:1rem;">STORE COUNT BY REVENUE RANGE</span>
+    </div>
+    <div style="background:#f5f5f5;padding:8px 16px;border:1px solid #ddd;margin-bottom:4px;">
+        <span style="color:#555;font-size:0.8rem;">Count of kitchen stores in each revenue band per month</span>
+    </div>
+    """, unsafe_allow_html=True)
 
     rev_band_order = [
         "(a) Below INR 15 lacs", "(b) INR 15 to 25 lacs",
@@ -358,24 +402,42 @@ else:
     ]
 
     pivot2b = vdf.pivot_table(
-        index="REVENUE BAND",
-        columns="MONTH",
-        values="STORE",
-        aggfunc="count"
+        index="REVENUE BAND", columns="MONTH",
+        values="STORE", aggfunc="count"
     ).fillna(0).astype(int)
-
-    # Reorder rows
     pivot2b = pivot2b.reindex([r for r in rev_band_order if r in pivot2b.index])
 
-    # Grand total row
     grand_row_b = pd.DataFrame(pivot2b.sum()).T
     grand_row_b.index = ["Grand Total"]
     pivot2b = pd.concat([pivot2b, grand_row_b])
 
-    st.dataframe(
-        pivot2b,
-        use_container_width=True
-    )
+    months_cols_b = [str(m) for m in pivot2b.columns.tolist()]
+    row_labels_b  = pivot2b.index.tolist()
+    cell_vals_b   = []
+    for m in pivot2b.columns:
+        cell_vals_b.append([str(int(pivot2b.loc[r, m])) for r in pivot2b.index])
+
+    row_colors_b = ["#ffffff"] * (len(row_labels_b) - 1) + ["#f0f0f0"]
+
+    fig_2b = go.Figure(data=[go.Table(
+        columnwidth=[200] + [80] * len(months_cols_b),
+        header=dict(
+            values=["<b>Revenue Band</b>"] + [f"<b>{m}</b>" for m in months_cols_b],
+            fill_color="#1a1a1a",
+            font=dict(color="white", size=12),
+            align=["left"] + ["center"] * len(months_cols_b),
+            height=35
+        ),
+        cells=dict(
+            values=[row_labels_b] + cell_vals_b,
+            fill_color=[row_colors_b] + [row_colors_b] * len(months_cols_b),
+            font=dict(color="#333333", size=12),
+            align=["left"] + ["center"] * len(months_cols_b),
+            height=32
+        )
+    )])
+    fig_2b.update_layout(margin=dict(l=0, r=0, t=0, b=0), height=220)
+    st.plotly_chart(fig_2b, use_container_width=True)
 
     # Chart for 2b
     chart2b = vdf.groupby(["MONTH", "REVENUE BAND"])["STORE"].count().reset_index()
