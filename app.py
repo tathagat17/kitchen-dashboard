@@ -77,9 +77,8 @@ def load_data():
 df = load_data()
 
 # Last refresh timestamp (shown in sidebar for real-time awareness)
-from datetime import timezone, timedelta
-IST = timezone(timedelta(hours=5, minutes=30))
-last_refresh = datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST")
+last_refresh = datetime.now().strftime("%d %b %Y, %I:%M %p")
+
 # ─────────────────────────────────────────────
 # SIDEBAR — NAVIGATION
 # ─────────────────────────────────────────────
@@ -106,12 +105,39 @@ if dashboard == "📊 Dashboard 1 — Kitchen Level PNL":
     st.markdown("Filter and explore store-level Profit & Loss across months.")
 
     # ── KPI CARDS ──
+    total_stores    = df["STORE"].nunique()
+    total_cities    = df["CITY"].nunique()
+    avg_revenue     = df["NET REVENUE"].mean() / 100000
+    pct_profitable  = (df["EBITDA CATEGORY"] == "EBITDA +ve").mean() * 100
+
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total Stores",       df["STORE"].nunique())
-    col2.metric("Total Cities",       df["CITY"].nunique())
-    col3.metric("Avg Net Revenue",    f"₹{df['NET REVENUE'].mean()/100000:.1f}L")
-    col4.metric("% Profitable Stores",
-                f"{(df['EBITDA CATEGORY']=='EBITDA +ve').mean()*100:.1f}%")
+
+    kpi_css = """
+        background: linear-gradient({bg1}, {bg2});
+        border-radius: 14px;
+        padding: 20px 16px;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        border-left: 5px solid {border};
+    """
+
+    cards = [
+        (col1, "🏪", "Total Stores",        f"{total_stores}",       "#1a1a2e", "#16213e", "#4ecca3"),
+        (col2, "🏙️", "Total Cities",        f"{total_cities}",       "#1a1a2e", "#0f3460", "#f5a623"),
+        (col3, "💰", "Avg Net Revenue",     f"₹{avg_revenue:.1f}L",  "#1a1a2e", "#162447", "#e94560"),
+        (col4, "📈", "% Profitable Stores", f"{pct_profitable:.1f}%","#1a1a2e", "#1b1b2f", "#a8ff78"),
+    ]
+
+    for col, icon, label, value, bg1, bg2, border in cards:
+        col.markdown(f"""
+        <div style="{kpi_css.format(bg1=bg1, bg2=bg2, border=border)}">
+            <div style="font-size: 2rem;">{icon}</div>
+            <div style="color: #aaaaaa; font-size: 0.85rem; margin-top: 6px; letter-spacing: 1px; text-transform: uppercase;">{label}</div>
+            <div style="color: {border}; font-size: 2rem; font-weight: 800; margin-top: 6px;">{value}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
 
     st.markdown("---")
 
