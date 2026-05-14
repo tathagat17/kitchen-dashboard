@@ -80,7 +80,6 @@ df = load_data()
 from datetime import timezone, timedelta
 IST = timezone(timedelta(hours=5, minutes=30))
 last_refresh = datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST")
-
 # ─────────────────────────────────────────────
 # SIDEBAR — NAVIGATION
 # ─────────────────────────────────────────────
@@ -164,7 +163,7 @@ if dashboard == "📊 Dashboard 1 — Kitchen Level PNL":
         store_opts = ["All"] + sorted(df["STORE"].dropna().unique().tolist())
         sel_store = st.selectbox("Store", store_opts)
 
-    f5, f6, f7 = st.columns(3)
+    f5, f6, f7, f8 = st.columns(4)
 
     with f5:
         rev_cohort_opts = ["All"] + sorted(df["REVENUE COHORT"].dropna().unique().tolist())
@@ -178,8 +177,12 @@ if dashboard == "📊 Dashboard 1 — Kitchen Level PNL":
         cm_cohort_opts = ["All"] + sorted(df["CM COHORT"].dropna().unique().tolist())
         sel_cm_cohort = st.selectbox("CM Cohort", cm_cohort_opts)
 
+    with f8:
+        ebitda_cohort_opts = ["All"] + sorted(df["EBITDA COHORT"].dropna().unique().tolist())
+        sel_ebitda_cohort = st.selectbox("EBITDA Cohort", ebitda_cohort_opts)
+
     # Range sliders
-    s1, s2, s3 = st.columns(3)
+    s1, s2, s3, s4 = st.columns(4)
 
     with s1:
         ebitda_min = int(df["KITCHEN EBITDA"].min())
@@ -202,15 +205,21 @@ if dashboard == "📊 Dashboard 1 — Kitchen Level PNL":
             rev_min, rev_max, (rev_min, rev_max), step=50000
         )
 
+    with s4:
+        gm_min = int(df["GM%"].min())
+        gm_max = int(df["GM%"].max())
+        sel_gm_range = st.slider("GM% Range", gm_min, gm_max, (gm_min, gm_max))
+
     # ── APPLY FILTERS ──
     fdf = df.copy()
-    if sel_city  != "All": fdf = fdf[fdf["CITY"]           == sel_city]
-    if sel_zone  != "All": fdf = fdf[fdf["ZONE MAPPING"]   == sel_zone]
-    if sel_month != "All": fdf = fdf[fdf["MONTH"]          == sel_month]
-    if sel_store != "All": fdf = fdf[fdf["STORE"]          == sel_store]
-    if sel_rev_cohort  != "All": fdf = fdf[fdf["REVENUE COHORT"]  == sel_rev_cohort]
-    if sel_ebitda_cat  != "All": fdf = fdf[fdf["EBITDA CATEGORY"] == sel_ebitda_cat]
-    if sel_cm_cohort   != "All": fdf = fdf[fdf["CM COHORT"]       == sel_cm_cohort]
+    if sel_city         != "All": fdf = fdf[fdf["CITY"]            == sel_city]
+    if sel_zone         != "All": fdf = fdf[fdf["ZONE MAPPING"]    == sel_zone]
+    if sel_month        != "All": fdf = fdf[fdf["MONTH"]           == sel_month]
+    if sel_store        != "All": fdf = fdf[fdf["STORE"]           == sel_store]
+    if sel_rev_cohort   != "All": fdf = fdf[fdf["REVENUE COHORT"]  == sel_rev_cohort]
+    if sel_ebitda_cat   != "All": fdf = fdf[fdf["EBITDA CATEGORY"] == sel_ebitda_cat]
+    if sel_cm_cohort    != "All": fdf = fdf[fdf["CM COHORT"]       == sel_cm_cohort]
+    if sel_ebitda_cohort != "All": fdf = fdf[fdf["EBITDA COHORT"]  == sel_ebitda_cohort]
 
     fdf = fdf[
         (fdf["KITCHEN EBITDA"] >= sel_ebitda_range[0]) &
@@ -218,7 +227,9 @@ if dashboard == "📊 Dashboard 1 — Kitchen Level PNL":
         (fdf["CM%"]            >= sel_cm_range[0])     &
         (fdf["CM%"]            <= sel_cm_range[1])     &
         (fdf["NET REVENUE"]    >= sel_rev_range[0])    &
-        (fdf["NET REVENUE"]    <= sel_rev_range[1])
+        (fdf["NET REVENUE"]    <= sel_rev_range[1])    &
+        (fdf["GM%"]            >= sel_gm_range[0])     &
+        (fdf["GM%"]            <= sel_gm_range[1])
     ]
 
     st.markdown(f"**Showing {fdf['STORE'].nunique()} stores | {len(fdf)} records**")
