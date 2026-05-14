@@ -77,9 +77,8 @@ def load_data():
 df = load_data()
 
 # Last refresh timestamp (shown in sidebar for real-time awareness)
-from datetime import timezone, timedelta
-IST = timezone(timedelta(hours=5, minutes=30))
-last_refresh = datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST")
+last_refresh = datetime.now().strftime("%d %b %Y, %I:%M %p")
+
 # ─────────────────────────────────────────────
 # SIDEBAR — NAVIGATION
 # ─────────────────────────────────────────────
